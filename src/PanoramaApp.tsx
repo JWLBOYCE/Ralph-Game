@@ -8,6 +8,7 @@ import ConfettiBurst from './components/ConfettiBurst'
 import { playAnimalApproval, setAmbientLocation, startAmbient, setSfxVolume } from './utils/audio'
 import PanoramaBackground from './components/PanoramaBackground'
 import HospitalRoom from './components/HospitalRoom'
+import StBartsScene from './components/StBartsScene'
 import { getNode, PANORAMA_NODES } from './panorama/nodes'
 import * as THREE from 'three'
 
@@ -279,7 +280,10 @@ export default function PanoramaApp() {
             <HospitalRoom />
           )}
           {location === 'stbarts' && (
-            <HospitalRoom />
+            <>
+              {/* If GLTF available, StBartsScene renders it; otherwise fallback remains empty */}
+              <StBartsScene />
+            </>
           )}
 
           {/* Static camera + orbit (no follow) */}
