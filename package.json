@@ -8,7 +8,8 @@
     "dev": "vite --open --host=localhost --port 5173",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "fetch:dachshund": "node scripts/fetch-dachshund.mjs"
+    "fetch:dachshund": "node scripts/fetch-dachshund.mjs",
+    "fetch:animals": "node scripts/fetch-animals.mjs"
   },
   "dependencies": {
     "@react-three/cannon": "^6.6.0",

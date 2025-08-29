@@ -6,6 +6,8 @@ import { InteractionType } from '../utils/audio'
 
 type Vec3 = [number, number, number]
 
+type Trick = 'sit' | 'lie' | 'roll'
+
 interface DachshundRiggedProps {
   position: Vec3
   onInteraction: (type: InteractionType) => void
@@ -14,6 +16,7 @@ interface DachshundRiggedProps {
   mobileDirection?: 'up'|'down'|'left'|'right'|'stop'
   action?: InteractionType
   ballPosition?: Vec3
+  onTrick?: (t: Trick, p: Vec3) => void
 }
 
 // Try to use a local dachshund model if present (served from public/models),
@@ -68,7 +71,7 @@ function FootstepDust({ position }: { position: THREE.Vector3 }) {
   )
 }
 
-export function DachshundRigged({ position, onInteraction, onPosition, showInteractionButtons, mobileDirection = 'stop' }: DachshundRiggedProps) {
+export function DachshundRigged({ position, onInteraction, onPosition, showInteractionButtons, mobileDirection = 'stop', onTrick }: DachshundRiggedProps) {
   const url = useDogModelUrl()
   const ref = useRef<THREE.Group>(null)
 
@@ -76,6 +79,8 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
   const dustPos = useMemo(() => new THREE.Vector3(), [])
   const [dustTick, setDustTick] = useState(0)
   const lastPos = useRef(new THREE.Vector3())
+  const trickRef = useRef<Trick | null>(null)
+  const trickUntil = useRef<number>(0)
 
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
@@ -84,11 +89,14 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
         e.preventDefault()
         e.stopPropagation()
       }
-      if (k === 'w' || k === 'arrowup') keys.current.up = true
-      if (k === 's' || k === 'arrowdown') keys.current.down = true
-      if (k === 'a' || k === 'arrowleft') keys.current.left = true
-      if (k === 'd' || k === 'arrowright') keys.current.right = true
+      if (k === 'arrowup') keys.current.up = true
+      if (k === 'arrowdown') keys.current.down = true
+      if (k === 'arrowleft') keys.current.left = true
+      if (k === 'arrowright') keys.current.right = true
       if (k === ' ') onInteraction('bark')
+      if (k === 's') { trickRef.current = 'sit'; trickUntil.current = performance.now() + 1200; onTrick?.('sit', [ref.current?.position.x||0, ref.current?.position.y||0, ref.current?.position.z||0]) }
+      if (k === 'l') { trickRef.current = 'lie'; trickUntil.current = performance.now() + 1500; onTrick?.('lie', [ref.current?.position.x||0, ref.current?.position.y||0, ref.current?.position.z||0]) }
+      if (k === 'r') { trickRef.current = 'roll'; trickUntil.current = performance.now() + 1600; onTrick?.('roll', [ref.current?.position.x||0, ref.current?.position.y||0, ref.current?.position.z||0]) }
     }
     const onUp = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase()
@@ -96,10 +104,10 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
         e.preventDefault()
         e.stopPropagation()
       }
-      if (k === 'w' || k === 'arrowup') keys.current.up = false
-      if (k === 's' || k === 'arrowdown') keys.current.down = false
-      if (k === 'a' || k === 'arrowleft') keys.current.left = false
-      if (k === 'd' || k === 'arrowright') keys.current.right = false
+      if (k === 'arrowup') keys.current.up = false
+      if (k === 'arrowdown') keys.current.down = false
+      if (k === 'arrowleft') keys.current.left = false
+      if (k === 'arrowright') keys.current.right = false
       // no-op on key release
     }
     window.addEventListener('keydown', onDown)
@@ -117,6 +125,30 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
   useFrame((state, delta) => {
     const body = ref.current as THREE.Group | null
     if (!body) return
+    // Apply trick posing first
+    const now = performance.now()
+    if (trickRef.current && now > trickUntil.current) trickRef.current = null
+
+    const bodyRot = body.rotation
+    const bodyPos = body.position
+    const damp = 0.2
+    if (trickRef.current === 'sit') {
+      // slight crouch and tilt back
+      bodyRot.x += ((0.5) - bodyRot.x) * damp
+      bodyPos.y += ((0.2) - bodyPos.y) * damp
+    } else if (trickRef.current === 'lie') {
+      bodyRot.x += ((-Math.PI/2) - bodyRot.x) * damp
+      bodyPos.y += ((0.1) - bodyPos.y) * damp
+    } else if (trickRef.current === 'roll') {
+      bodyRot.z += 4 * delta
+      bodyPos.y += ((0.15) - bodyPos.y) * damp
+    } else {
+      // return to neutral pose
+      bodyRot.x += (0 - bodyRot.x) * damp
+      bodyRot.z += (0 - bodyRot.z) * damp
+      bodyPos.y += ((position[1]) - bodyPos.y) * damp
+    }
+
     // Movement
     const speed = 7.0
     let mx = 0, mz = 0
@@ -130,7 +162,7 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
     }
     const moving = mx !== 0 || mz !== 0
     setIsMoving(moving)
-    if (moving) {
+    if (moving && !trickRef.current) {
       const len = Math.hypot(mx, mz) || 1
       const vx = (mx / len) * speed
       const vz = (mz / len) * speed

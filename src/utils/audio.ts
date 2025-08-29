@@ -153,3 +153,38 @@ export function vibratePulse(ms = 20) {
     try { navigator.vibrate(ms); } catch { /* ignore */ }
   }
 }
+
+export async function playSuccessChime() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  try {
+    // Try local samples first
+    const choices = ['/sounds/success1.mp3','/sounds/success2.mp3','/sounds/success3.mp3'];
+    const ok: AudioBuffer[] = [];
+    for (const p of choices) {
+      try { ok.push(await loadAudioBuffer(p)); } catch {}
+    }
+    if (ok.length) {
+      const src = ctx.createBufferSource();
+      src.buffer = ok[(Math.random()*ok.length)|0];
+      const g = ctx.createGain(); g.gain.value = 0.6;
+      src.connect(g).connect(ctx.destination);
+      src.start();
+      return;
+    }
+  } catch {}
+
+  // Fallback: synth chime (two quick notes)
+  try {
+    if (ctx.state === 'suspended') ctx.resume();
+    const g = ctx.createGain(); g.gain.value = 0.15; g.connect(ctx.destination);
+    const o1 = ctx.createOscillator(); o1.type = 'sine';
+    const o2 = ctx.createOscillator(); o2.type = 'sine';
+    o1.connect(g); o2.connect(g);
+    const t = ctx.currentTime;
+    o1.frequency.setValueAtTime(880, t);
+    o1.start(t); o1.stop(t + 0.12);
+    o2.frequency.setValueAtTime(1175, t + 0.1);
+    o2.start(t + 0.1); o2.stop(t + 0.25);
+  } catch {}
+}
