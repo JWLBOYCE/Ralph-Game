@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import { OrbitControls, Html } from '@react-three/drei'
 // No shadows; pure panorama
 import { DachshundRigged } from './components/DachshundRigged'
 import AnimalActor from './components/AnimalActor'
@@ -26,6 +26,11 @@ export default function PanoramaApp() {
   const moveTargetRef = useRef<[number,number,number] | null>(null)
   const [sfxVol, setSfxVol] = useState(1.0)
   const [reducedMotion, setReducedMotion] = useState(false)
+  const [showCameraMenu, setShowCameraMenu] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
+  const [showMinimap, setShowMinimap] = useState(false)
+  const [toasts, setToasts] = useState<Array<{ id: string; pos: [number,number,number]; text: string }>>([])
 
   // Camera tween helper
   function tweenCamera(toTarget: THREE.Vector3, toDistance?: number, ms = 500) {
@@ -63,24 +68,7 @@ export default function PanoramaApp() {
   function presetClose() {
     tweenCamera(new THREE.Vector3(0, 0.8, -6), 10, 500)
   }
-  function presetLeft() {
-    if (!cam || !controlsRef.current) return
-    const controls = controlsRef.current as any
-    const target = controls.target.clone()
-    const offset = cam.position.clone().sub(target)
-    offset.applyAxisAngle(new THREE.Vector3(0,1,0), 0.35)
-    tweenCamera(target, offset.length(), 500)
-    cam.position.copy(target.clone().add(offset))
-  }
-  function presetRight() {
-    if (!cam || !controlsRef.current) return
-    const controls = controlsRef.current as any
-    const target = controls.target.clone()
-    const offset = cam.position.clone().sub(target)
-    offset.applyAxisAngle(new THREE.Vector3(0,1,0), -0.35)
-    tweenCamera(target, offset.length(), 500)
-    cam.position.copy(target.clone().add(offset))
-  }
+  // Left/Right presets removed for simplicity; orbit drag covers these.
 
   const people = [
     { id: 'a1', name: 'Cowie', species: 'cow' as const, pos: [-15, 0, -6] as [number,number,number], desired: 'sit' as const },
@@ -95,7 +83,6 @@ export default function PanoramaApp() {
   const [lastSuccessAt, setLastSuccessAt] = useState<number>(0)
   type Trick = 'sit'|'lie'|'roll'
   const [challenge, setChallenge] = useState<{ id: string; trick: Trick; expiresAt: number } | null>(null)
-  const [challengeWins, setChallengeWins] = useState(0)
 
   function newChallenge() {
     if (location === 'stbarts') { setChallenge(null); return }
@@ -140,6 +127,10 @@ export default function PanoramaApp() {
       const intensify = Math.min(3, Math.floor((streak + 1)/3))
       const count = 32 * (1 + intensify)
       setBursts((b) => [...b, { id: `${nearest!.id}-${Date.now()}`, pos: [p[0], p[1]+0.5, p[2]], count }])
+      // brief toast near Ralph
+      const tid = `toast-${Date.now()}`
+      setToasts((ts) => [...ts, { id: tid, pos: [p[0], p[1]+1.2, p[2]], text: 'Great!' }])
+      setTimeout(() => setToasts((arr) => arr.filter(t => t.id !== tid)), 1200)
       playAnimalApproval(nearest.species, nearest.pos)
       // update streak (reset if > 3s since last success)
       const now = performance.now()
@@ -148,7 +139,6 @@ export default function PanoramaApp() {
       dollyCinematic()
       // Challenge check
       if (challenge && challenge.id === nearest.id && challenge.trick === trick) {
-        setChallengeWins((c) => c + 1)
         setBursts((b) => [...b, { id: `${nearest!.id}-bonus-${Date.now()}`, pos: [p[0], p[1]+0.5, p[2]], count: 96 }])
         newChallenge()
       }
@@ -174,8 +164,13 @@ export default function PanoramaApp() {
       if (v) { const f = parseFloat(v); if (!Number.isNaN(f)) { setSfxVol(f); setSfxVolume(f); } }
       const rm = localStorage.getItem('ralph_reduced_motion');
       if (rm) setReducedMotion(rm === '1')
+      const mm = localStorage.getItem('ralph_show_minimap');
+      if (mm) setShowMinimap(mm === '1')
+      const seen = localStorage.getItem('ralph_help_seen');
+      if (!seen) setShowHelp(true)
     } catch {}
   }, [])
+  useEffect(() => { try { localStorage.setItem('ralph_show_minimap', showMinimap ? '1' : '0') } catch {} }, [showMinimap])
 
   // Mood decay
   useEffect(() => {
@@ -215,57 +210,92 @@ export default function PanoramaApp() {
 
   return (
     <div className="game-container photorealistic">
-      <div className="game-header photorealistic">
+      <div className="game-header photorealistic" style={{ position: 'relative' }}>
         <h1>Ralph’s Street View</h1>
         <div className="controls-info">
-          <p>Move: Arrow Keys • Tricks: S (Sit), L (Lie), R (Roll)</p>
-          <p>No wormholes; use the toggle to switch locations.</p>
+          <p>Get close, then press S/L/R to do tricks.</p>
         </div>
         <div className="controls-info">
           <button className="photorealistic-toggle" onClick={() => setLocation('street')}>Street</button>
           <button className="photorealistic-toggle" onClick={() => setLocation('hospital')}>Hospital Room</button>
           <button className="photorealistic-toggle" onClick={() => setLocation('stbarts')}>St Bartholomew's</button>
         </div>
-      </div>
-      <div className="game-scene photorealistic">
-        {/* Camera presets */}
-        <div className="controls-info" style={{ position: 'absolute', zIndex: 5, right: 8, top: 84 }}>
-          <button className="photorealistic-toggle" onClick={presetWide}>Wide</button>
-          <button className="photorealistic-toggle" onClick={presetClose}>Close</button>
-          <button className="photorealistic-toggle" onClick={presetLeft}>Left</button>
-          <button className="photorealistic-toggle" onClick={presetRight}>Right</button>
-          <span style={{ marginLeft: 8 }}>🔥 {streak}</span>
-          <label style={{ marginLeft: 8 }}>
-            SFX
-            <input type="range" min={0} max={1} step={0.05} value={sfxVol} onChange={(e) => { const v = parseFloat(e.target.value); setSfxVol(v); setSfxVolume(v); try { localStorage.setItem('ralph_sfx_vol', String(v)) } catch {} }} />
-          </label>
-          <label style={{ marginLeft: 8 }}>
-            Reduce Motion
-            <input type="checkbox" checked={reducedMotion} onChange={(e) => { setReducedMotion(e.target.checked); try { localStorage.setItem('ralph_reduced_motion', e.target.checked ? '1' : '0') } catch {} }} />
-          </label>
+        <div style={{ position: 'absolute', right: 12, top: 12, display: 'flex', gap: 8 }}>
+          <button className="photorealistic-toggle" aria-label="Camera" title="Camera" onClick={() => { setShowCameraMenu((v)=>!v); setShowSettings(false); }}>
+            🎥
+          </button>
+          <button className="photorealistic-toggle" aria-label="Settings" title="Settings" onClick={() => { setShowSettings((v)=>!v); setShowCameraMenu(false); }}>
+            ⚙︎
+          </button>
+          <button className="photorealistic-toggle" aria-label="Help" title="Help" onClick={() => { setShowHelp(true); try { localStorage.setItem('ralph_help_seen', '1') } catch {} }}>
+            ?
+          </button>
         </div>
-        {/* Minimap */}
-        <div style={{ position: 'absolute', zIndex: 5, right: 8, bottom: 12, width: 120, height: 120, background: 'rgba(0,0,0,0.35)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)' }}>
-          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-            {(() => {
-              const W = 120, H = 120, LIM = 25
-              const toX = (x: number) => ((x + LIM) / (2*LIM)) * W
-              const toY = (z: number) => ((z + LIM) / (2*LIM)) * H
-              const dots = [] as any[]
-              // Ralph
-              dots.push(<div key="r" style={{ position: 'absolute', left: toX(ralphPos[0]) - 3, top: toY(ralphPos[2]) - 3, width: 6, height: 6, background: '#ffd93d', borderRadius: '50%' }} />)
-              for (const p of people) {
-                dots.push(<div key={p.id} title={p.name} style={{ position: 'absolute', left: toX(p.pos[0]) - 2, top: toY(p.pos[2]) - 2, width: 4, height: 4, background: '#4dd599', borderRadius: '50%' }} />)
-              }
-              return dots
-            })()}
+        {showCameraMenu && (
+          <div style={{ position: 'absolute', right: 12, top: 52, zIndex: 10, background: 'rgba(0,0,0,0.55)', padding: '8px 10px', borderRadius: 8 }}>
+            <button className="photorealistic-toggle" onClick={() => { presetWide(); setShowCameraMenu(false) }}>Wide</button>
+            <button className="photorealistic-toggle" onClick={() => { presetClose(); setShowCameraMenu(false) }} style={{ marginLeft: 8 }}>Close</button>
+          </div>
+        )}
+        {showSettings && (
+          <div style={{ position: 'absolute', right: 12, top: 52, zIndex: 10, background: 'rgba(0,0,0,0.55)', padding: 12, borderRadius: 8, minWidth: 220 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>🔊 SFX</span>
+              <input type="range" min={0} max={1} step={0.05} value={sfxVol} onChange={(e) => { const v = parseFloat(e.target.value); setSfxVol(v); setSfxVolume(v); try { localStorage.setItem('ralph_sfx_vol', String(v)) } catch {} }} />
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+              <input type="checkbox" checked={reducedMotion} onChange={(e) => { setReducedMotion(e.target.checked); try { localStorage.setItem('ralph_reduced_motion', e.target.checked ? '1' : '0') } catch {} }} /> Reduce Motion
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+              <input type="checkbox" checked={showMinimap} onChange={(e) => setShowMinimap(e.target.checked)} /> Show Minimap
+            </label>
+          </div>
+        )}
+      </div>
+      {/* Help overlay */}
+      {showHelp && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowHelp(false)}>
+          <div style={{ background: 'rgba(20,20,20,0.9)', color: '#fff', padding: 20, borderRadius: 12, width: 420 }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0 }}>How to Play</h3>
+            <ul style={{ lineHeight: 1.6 }}>
+              <li>Drag to look around</li>
+              <li>Click/tap the ground to move Ralph</li>
+              <li>Press S / L / R to Sit / Lie / Roll</li>
+              <li>Get close to animals for name bubbles</li>
+              <li>Hold C to call the nearest animal</li>
+            </ul>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+              <button className="photorealistic-toggle" onClick={() => { setShowHelp(false); try { localStorage.setItem('ralph_help_seen', '1') } catch {} }}>Got it</button>
+            </div>
           </div>
         </div>
+      )}
+      <div className="game-scene photorealistic">
+        {/* Minimap (toggle in settings) */}
+        {showMinimap && (
+          <div style={{ position: 'absolute', zIndex: 5, right: 8, bottom: 12, width: 120, height: 120, background: 'rgba(0,0,0,0.35)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)' }}>
+            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+              {(() => {
+                const W = 120, H = 120, LIM = 25
+                const toX = (x: number) => ((x + LIM) / (2*LIM)) * W
+                const toY = (z: number) => ((z + LIM) / (2*LIM)) * H
+                const dots = [] as any[]
+                // Ralph
+                dots.push(<div key="r" style={{ position: 'absolute', left: toX(ralphPos[0]) - 3, top: toY(ralphPos[2]) - 3, width: 6, height: 6, background: '#ffd93d', borderRadius: '50%' }} />)
+                for (const p of people) {
+                  dots.push(<div key={p.id} title={p.name} style={{ position: 'absolute', left: toX(p.pos[0]) - 2, top: toY(p.pos[2]) - 2, width: 4, height: 4, background: '#4dd599', borderRadius: '50%' }} />)
+                }
+                return dots
+              })()}
+            </div>
+          </div>
+        )}
+        {/* Challenge pill bottom center */}
         {challenge && (
-          <div className="controls-info" style={{ position: 'absolute', zIndex: 5, left: 8, top: 84, background: 'rgba(0,0,0,0.35)', padding: '4px 8px', borderRadius: 6 }}>
-            <span>Challenge: do {challenge.trick.toUpperCase()} near {challenge.id.toUpperCase()}</span>
+          <div className="controls-info" style={{ position: 'absolute', zIndex: 5, left: '50%', transform: 'translateX(-50%)', bottom: 16, background: 'rgba(0,0,0,0.45)', padding: '6px 12px', borderRadius: 999 }}>
+            <span>Do {challenge.trick.toUpperCase()} near {(() => { const t = people.find(p => p.id === challenge.id); return t ? t.name : challenge.id.toUpperCase() })()}</span>
             <span style={{ marginLeft: 8 }}>⏳ {Math.max(0, Math.ceil((challenge.expiresAt - performance.now())/1000))}s</span>
-            <span style={{ marginLeft: 8 }}>⭐ {challengeWins}</span>
+            {streak > 1 && <span style={{ marginLeft: 8 }}>🔥 {streak}</span>}
           </div>
         )}
         <Canvas camera={{ position: [12, 6.5, 12], fov: 55 }} dpr={[1, 1.5]}
@@ -320,6 +350,12 @@ export default function PanoramaApp() {
 
           {bursts.map((b) => (
             <ConfettiBurst key={b.id} position={b.pos} count={b.count} onDone={() => setBursts((arr) => arr.filter(x => x.id !== b.id))} />
+          ))}
+          {/* Success toasts near Ralph */}
+          {toasts.map((t) => (
+            <Html key={t.id} position={t.pos} center>
+              <div style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px', borderRadius: 8, fontWeight: 600 }}>{t.text}</div>
+            </Html>
           ))}
 
           {/* People row in foreground, facing the user */}
