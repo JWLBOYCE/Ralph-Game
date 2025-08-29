@@ -17,7 +17,7 @@ export default function PanoramaApp() {
   const [ralphPos, setRalphPos] = useState<[number, number, number]>([0, 0.5, 0])
   const [happyMap, setHappyMap] = useState<Record<string, boolean>>({})
   const [bursts, setBursts] = useState<Array<{ id: string; pos: [number,number,number]; count?: number }>>([])
-  const [location, setLocation] = useState<'street'|'hospital'>('street')
+  const [location, setLocation] = useState<'street'|'hospital'|'stbarts'>('street')
   const [moodMap, setMoodMap] = useState<Record<string, number>>({})
   const [calledId, setCalledId] = useState<string | null>(null)
   const controlsRef = useRef<any>(null)
@@ -97,6 +97,7 @@ export default function PanoramaApp() {
   const [challengeWins, setChallengeWins] = useState(0)
 
   function newChallenge() {
+    if (location === 'stbarts') { setChallenge(null); return }
     const choices = people
     const target = choices[(Math.random()*choices.length)|0]
     const tricks: Trick[] = ['sit','lie','roll']
@@ -110,7 +111,7 @@ export default function PanoramaApp() {
       if (performance.now() > challenge.expiresAt) newChallenge()
     }, 500)
     return () => clearInterval(i)
-  }, [challenge])
+  }, [challenge, location])
   function dollyCinematic() {
     if (reducedMotion) return
     if (!controlsRef.current) return
@@ -122,6 +123,7 @@ export default function PanoramaApp() {
   }
 
   function handleTrick(trick: 'sit'|'lie'|'roll', p: [number,number,number]) {
+    if (location === 'stbarts') return
     // Check nearest person in radius
     let nearest: { id: string; desired: 'sit'|'lie'|'roll'; species: string; pos: [number,number,number] } | null = null
     let best = Infinity
@@ -161,7 +163,7 @@ export default function PanoramaApp() {
   // No auto-transitions; location changes only via header toggle
   useEffect(() => {
     // Crossfade ambient based on location, if started
-    setAmbientLocation(location)
+    setAmbientLocation(location === 'street' ? 'street' : 'hospital')
   }, [location])
 
   // Load persisted settings
@@ -221,6 +223,7 @@ export default function PanoramaApp() {
         <div className="controls-info">
           <button className="photorealistic-toggle" onClick={() => setLocation('street')}>Street</button>
           <button className="photorealistic-toggle" onClick={() => setLocation('hospital')}>Hospital Room</button>
+          <button className="photorealistic-toggle" onClick={() => setLocation('stbarts')}>St Bartholomew's</button>
         </div>
       </div>
       <div className="game-scene photorealistic">
@@ -269,9 +272,13 @@ export default function PanoramaApp() {
           onCreated={({ camera }) => { setCam(camera as THREE.PerspectiveCamera) }}
         >
           {/* Background/environment per location */}
-          {location === 'street' ? (
+          {location === 'street' && (
             <PanoramaBackground key={node.id} files={node.files} />
-          ) : (
+          )}
+          {location === 'hospital' && (
+            <HospitalRoom />
+          )}
+          {location === 'stbarts' && (
             <HospitalRoom />
           )}
 
@@ -312,7 +319,7 @@ export default function PanoramaApp() {
           ))}
 
           {/* People row in foreground, facing the user */}
-          {people.map((p) => (
+          {location !== 'stbarts' && people.map((p) => (
             <AnimalActor
               key={p.id}
               name={p.name}
