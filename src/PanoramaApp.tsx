@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 // No shadows; pure panorama
@@ -7,6 +7,7 @@ import AnimalActor from './components/AnimalActor'
 import ConfettiBurst from './components/ConfettiBurst'
 import { playAnimalApproval } from './utils/audio'
 import PanoramaBackground from './components/PanoramaBackground'
+import HospitalRoom from './components/HospitalRoom'
 import { getNode, PANORAMA_NODES } from './panorama/nodes'
 
 export default function PanoramaApp() {
@@ -15,6 +16,7 @@ export default function PanoramaApp() {
   const [ralphPos, setRalphPos] = useState<[number, number, number]>([0, 0.5, 0])
   const [happyMap, setHappyMap] = useState<Record<string, boolean>>({})
   const [bursts, setBursts] = useState<Array<{ id: string; pos: [number,number,number] }>>([])
+  const [location, setLocation] = useState<'street'|'hospital'>('street')
 
   const people = [
     { id: 'a1', name: 'Cowie', species: 'cow' as const, pos: [-15, 0, -6] as [number,number,number], desired: 'sit' as const },
@@ -48,22 +50,7 @@ export default function PanoramaApp() {
     }
   }
 
-  // Transition when Ralph hits a hotspot
-  useEffect(() => {
-    const x = ralphPos[0], z = ralphPos[2]
-    const hit = node.neighbors.find((n) => {
-      const dx = x - n.position[0]
-      const dz = z - n.position[1]
-      return Math.hypot(dx, dz) < 1.0
-    })
-    if (hit) {
-      const next = getNode(hit.id)
-      if (next) {
-        setCurrentId(next.id)
-        setRalphPos([0, 0.5, 0])
-      }
-    }
-  }, [ralphPos, node])
+  // No auto-transitions; location changes only via header toggle
 
   return (
     <div className="game-container photorealistic">
@@ -71,28 +58,22 @@ export default function PanoramaApp() {
         <h1>Ralph’s Street View</h1>
         <div className="controls-info">
           <p>Move: Arrow Keys • Tricks: S (Sit), L (Lie), R (Roll)</p>
-          <p>Step on glowing rings to change location.</p>
+          <p>No wormholes; use the toggle to switch locations.</p>
+        </div>
+        <div className="controls-info">
+          <button className="photorealistic-toggle" onClick={() => setLocation('street')}>Street</button>
+          <button className="photorealistic-toggle" onClick={() => setLocation('hospital')}>Hospital Room</button>
         </div>
       </div>
       <div className="game-scene photorealistic">
         <Canvas camera={{ position: [12, 6.5, 12], fov: 55 }} dpr={[1, 1.5]}
           gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}>
-          {/* Background panorama */}
-          <PanoramaBackground key={node.id} files={node.files} />
-          {/* Transparent play area: no ground disc */}
-          {/* Hotspots */}
-          {node.neighbors.map((n) => (
-            <group key={n.id} position={[n.position[0], -0.49, n.position[1]]}>
-              <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[0.5, 0.7, 32]} />
-                <meshBasicMaterial color="#00ffcc" transparent opacity={0.8} />
-              </mesh>
-              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]}>
-                <ringGeometry args={[0.7, 0.85, 32]} />
-                <meshBasicMaterial color="#00ffcc" transparent opacity={0.4} />
-              </mesh>
-            </group>
-          ))}
+          {/* Background/environment per location */}
+          {location === 'street' ? (
+            <PanoramaBackground key={node.id} files={node.files} />
+          ) : (
+            <HospitalRoom />
+          )}
 
           {/* Static camera + orbit (no follow) */}
           <OrbitControls

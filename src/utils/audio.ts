@@ -212,7 +212,6 @@ export async function playAnimalApproval(species: string) {
 }
 
 let ambientStarted = false
-let ambientNodes: { g: GainNode; srcs: AudioBufferSourceNode[] } | null = null
 export async function startAmbient() {
   if (ambientStarted) return
   ambientStarted = true
@@ -224,11 +223,8 @@ export async function startAmbient() {
     for (const u of urls) { try { bufs.push(await loadAudioBuffer(u)) } catch {} }
     if (!bufs.length) return
     const g = ctx.createGain(); g.gain.value = 0.08; g.connect(ctx.destination)
-    const srcs: AudioBufferSourceNode[] = []
     for (const b of bufs) {
       const s = ctx.createBufferSource(); s.buffer = b; s.loop = true; s.connect(g); s.start()
-      srcs.push(s)
     }
-    ambientNodes = { g, srcs }
   } catch {}
 }
