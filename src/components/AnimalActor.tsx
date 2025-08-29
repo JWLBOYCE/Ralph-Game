@@ -1,5 +1,5 @@
 import { Html, useGLTF } from '@react-three/drei'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useRef, useEffect, useState } from 'react'
 
@@ -51,11 +51,17 @@ function GLTFAnimal({ url, species }: { url: string; species: Species }) {
 
 export default function AnimalActor({ name, species, position, desired, happy, ralphPos, mood = 0, targetPos }: Props) {
   const group = useRef<THREE.Group>(null)
-  const { camera } = useThree()
+  // No camera-aligned facing; keep fixed yaw
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null)
   const ringRef = useRef<THREE.Mesh>(null)
   const targetRef = useRef<[number, number, number] | undefined>(undefined)
   useEffect(() => { targetRef.current = targetPos }, [targetPos])
+  // Ensure a consistent yaw so all animals face the same direction
+  useEffect(() => {
+    if (group.current) {
+      group.current.rotation.y = 0
+    }
+  }, [])
 
   useEffect(() => {
     let canceled = false
@@ -98,7 +104,7 @@ export default function AnimalActor({ name, species, position, desired, happy, r
 
   useFrame((_, delta) => {
     if (group.current) {
-      group.current.lookAt(camera.position.x, camera.position.y, camera.position.z)
+      // Keep a fixed facing; do not rotate toward camera
       // move toward target if any
       if (targetRef.current) {
         const g = group.current

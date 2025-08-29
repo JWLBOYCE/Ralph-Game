@@ -5,10 +5,9 @@ import { OrbitControls, Html } from '@react-three/drei'
 import { DachshundRigged } from './components/DachshundRigged'
 import AnimalActor from './components/AnimalActor'
 import ConfettiBurst from './components/ConfettiBurst'
-import { playAnimalApproval, setAmbientLocation, startAmbient, setSfxVolume } from './utils/audio'
+import { playAnimalApproval, startAmbient, setSfxVolume } from './utils/audio'
 import PanoramaBackground from './components/PanoramaBackground'
-import HospitalRoom from './components/HospitalRoom'
-import StBartsScene from './components/StBartsScene'
+// Single location (Street) only
 import { getNode, PANORAMA_NODES } from './panorama/nodes'
 import * as THREE from 'three'
 
@@ -18,7 +17,7 @@ export default function PanoramaApp() {
   const [ralphPos, setRalphPos] = useState<[number, number, number]>([0, 0.5, 0])
   const [happyMap, setHappyMap] = useState<Record<string, boolean>>({})
   const [bursts, setBursts] = useState<Array<{ id: string; pos: [number,number,number]; count?: number }>>([])
-  const [location, setLocation] = useState<'street'|'hospital'|'stbarts'>('street')
+  // Single location; no toggle
   const [moodMap, setMoodMap] = useState<Record<string, number>>({})
   const [calledId, setCalledId] = useState<string | null>(null)
   const controlsRef = useRef<any>(null)
@@ -85,7 +84,6 @@ export default function PanoramaApp() {
   const [challenge, setChallenge] = useState<{ id: string; trick: Trick; expiresAt: number } | null>(null)
 
   function newChallenge() {
-    if (location === 'stbarts') { setChallenge(null); return }
     const choices = people
     const target = choices[(Math.random()*choices.length)|0]
     const tricks: Trick[] = ['sit','lie','roll']
@@ -99,7 +97,7 @@ export default function PanoramaApp() {
       if (performance.now() > challenge.expiresAt) newChallenge()
     }, 500)
     return () => clearInterval(i)
-  }, [challenge, location])
+  }, [challenge])
   function dollyCinematic() {
     if (reducedMotion) return
     if (!controlsRef.current) return
@@ -111,7 +109,6 @@ export default function PanoramaApp() {
   }
 
   function handleTrick(trick: 'sit'|'lie'|'roll', p: [number,number,number]) {
-    if (location === 'stbarts') return
     // Check nearest person in radius
     let nearest: { id: string; desired: 'sit'|'lie'|'roll'; species: string; pos: [number,number,number] } | null = null
     let best = Infinity
@@ -151,11 +148,7 @@ export default function PanoramaApp() {
     }
   }
 
-  // No auto-transitions; location changes only via header toggle
-  useEffect(() => {
-    // Crossfade ambient based on location, if started
-    setAmbientLocation(location === 'street' ? 'street' : 'hospital')
-  }, [location])
+  // Single location (street); no ambient crossfade needed
 
   // Load persisted settings
   useEffect(() => {
@@ -215,11 +208,7 @@ export default function PanoramaApp() {
         <div className="controls-info">
           <p>Get close, then press S/L/R to do tricks.</p>
         </div>
-        <div className="controls-info">
-          <button className="photorealistic-toggle" onClick={() => setLocation('street')}>Street</button>
-          <button className="photorealistic-toggle" onClick={() => setLocation('hospital')}>Hospital Room</button>
-          <button className="photorealistic-toggle" onClick={() => setLocation('stbarts')}>St Bartholomew's</button>
-        </div>
+        {/* Single location; tabs removed */}
         <div style={{ position: 'absolute', right: 12, top: 12, display: 'flex', gap: 8 }}>
           <button className="photorealistic-toggle" aria-label="Camera" title="Camera" onClick={() => { setShowCameraMenu((v)=>!v); setShowSettings(false); }}>
             🎥
@@ -303,18 +292,7 @@ export default function PanoramaApp() {
           onCreated={({ camera }) => { setCam(camera as THREE.PerspectiveCamera) }}
         >
           {/* Background/environment per location */}
-          {location === 'street' && (
-            <PanoramaBackground key={node.id} files={node.files} />
-          )}
-          {location === 'hospital' && (
-            <HospitalRoom />
-          )}
-          {location === 'stbarts' && (
-            <>
-              {/* If GLTF available, StBartsScene renders it; otherwise fallback remains empty */}
-              <StBartsScene />
-            </>
-          )}
+          <PanoramaBackground key={node.id} files={node.files} />
 
           {/* Static camera + orbit (no follow) */}
           <OrbitControls
@@ -359,7 +337,7 @@ export default function PanoramaApp() {
           ))}
 
           {/* People row in foreground, facing the user */}
-          {location !== 'stbarts' && people.map((p) => (
+          {people.map((p) => (
             <AnimalActor
               key={p.id}
               name={p.name}
