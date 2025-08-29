@@ -72,7 +72,7 @@
 
 /* Game Scene */
 .game-scene {
-  @apply w-full h-96 md:h-[600px] relative;
+  @apply w-full h-[75vh] md:h-[85vh] relative;
   background: transparent;
 }
 
@@ -199,6 +199,25 @@
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
   border-radius: 50%;
   padding: 8px;
+}
+/* Sky labels shown high above actors */
+.sky-label {
+  pointer-events: none;
+  background: rgba(255,255,255,0.92);
+  border: 2px solid rgba(255,255,255,0.45);
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+  text-align: center;
+}
+.sky-label-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+.sky-label-command {
+  font-weight: 600;
+  font-size: 13px;
+  color: #374151;
 }
 
 /* Interaction Log */
