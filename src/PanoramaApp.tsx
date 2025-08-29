@@ -11,7 +11,7 @@ import HospitalRoom from './components/HospitalRoom'
 import { getNode, PANORAMA_NODES } from './panorama/nodes'
 
 export default function PanoramaApp() {
-  const [currentId, setCurrentId] = useState(PANORAMA_NODES[0].id)
+  const [currentId] = useState(PANORAMA_NODES[0].id)
   const node = getNode(currentId)!
   const [ralphPos, setRalphPos] = useState<[number, number, number]>([0, 0.5, 0])
   const [happyMap, setHappyMap] = useState<Record<string, boolean>>({})
