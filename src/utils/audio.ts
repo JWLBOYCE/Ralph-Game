@@ -188,3 +188,47 @@ export async function playSuccessChime() {
     o2.start(t + 0.1); o2.stop(t + 0.25);
   } catch {}
 }
+
+export async function playAnimalApproval(species: string) {
+  const ctx = getAudioContext();
+  if (!ctx) return playSuccessChime();
+  const candidates = [
+    `/sounds/approve-${species.toLowerCase()}.mp3`,
+    `/sounds/${species.toLowerCase()}-approve.mp3`,
+  ];
+  for (const url of candidates) {
+    try {
+      const buf = await loadAudioBuffer(url);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const g = ctx.createGain();
+      g.gain.value = 0.6;
+      src.connect(g).connect(ctx.destination);
+      src.start();
+      return;
+    } catch {}
+  }
+  await playSuccessChime();
+}
+
+let ambientStarted = false
+let ambientNodes: { g: GainNode; srcs: AudioBufferSourceNode[] } | null = null
+export async function startAmbient() {
+  if (ambientStarted) return
+  ambientStarted = true
+  const ctx = getAudioContext();
+  if (!ctx) return
+  try {
+    const urls = ['/sounds/ambient-wind.mp3','/sounds/ambient-birds.mp3']
+    const bufs: AudioBuffer[] = []
+    for (const u of urls) { try { bufs.push(await loadAudioBuffer(u)) } catch {} }
+    if (!bufs.length) return
+    const g = ctx.createGain(); g.gain.value = 0.08; g.connect(ctx.destination)
+    const srcs: AudioBufferSourceNode[] = []
+    for (const b of bufs) {
+      const s = ctx.createBufferSource(); s.buffer = b; s.loop = true; s.connect(g); s.start()
+      srcs.push(s)
+    }
+    ambientNodes = { g, srcs }
+  } catch {}
+}

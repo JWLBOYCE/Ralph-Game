@@ -2,7 +2,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html, useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
-import { InteractionType } from '../utils/audio'
+import { InteractionType, startAmbient } from '../utils/audio'
 
 type Vec3 = [number, number, number]
 
@@ -85,6 +85,7 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase()
+      startAmbient()
       if (k === 'arrowup' || k === 'arrowdown' || k === 'arrowleft' || k === 'arrowright' || k === 'w' || k === 'a' || k === 's' || k === 'd' || k === ' ') {
         e.preventDefault()
         e.stopPropagation()

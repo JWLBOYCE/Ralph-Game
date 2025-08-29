@@ -5,7 +5,7 @@ import { OrbitControls } from '@react-three/drei'
 import { DachshundRigged } from './components/DachshundRigged'
 import AnimalActor from './components/AnimalActor'
 import ConfettiBurst from './components/ConfettiBurst'
-import { playSuccessChime } from './utils/audio'
+import { playAnimalApproval } from './utils/audio'
 import PanoramaBackground from './components/PanoramaBackground'
 import { getNode, PANORAMA_NODES } from './panorama/nodes'
 
@@ -27,18 +27,24 @@ export default function PanoramaApp() {
 
   function handleTrick(trick: 'sit'|'lie'|'roll', p: [number,number,number]) {
     // Check nearest person in radius
-    let nearest: { id: string; desired: string } | null = null
+    let nearest: { id: string; desired: 'sit'|'lie'|'roll'; species: string } | null = null
     let best = Infinity
     for (const person of people) {
       const dx = person.pos[0] - p[0]
       const dz = person.pos[2] - p[2]
       const d = Math.hypot(dx, dz)
-      if (d < best) { best = d; nearest = { id: person.id, desired: person.desired } }
+      if (d < best) { best = d; nearest = { id: person.id, desired: person.desired, species: person.species } }
     }
     if (nearest && best < 2 && nearest.desired === trick) {
       setHappyMap((m) => ({ ...m, [nearest!.id]: true }))
       setBursts((b) => [...b, { id: `${nearest!.id}-${Date.now()}`, pos: [p[0], p[1]+0.5, p[2]] }])
-      playSuccessChime()
+      playAnimalApproval(nearest.species)
+      // Advance that animal's desired trick in a simple cycle
+      const next = trick === 'sit' ? 'lie' : trick === 'lie' ? 'roll' : 'sit'
+      const idx = people.findIndex(pr => pr.id === nearest!.id)
+      if (idx >= 0) {
+        people[idx].desired = next as any
+      }
     }
   }
 
@@ -69,7 +75,7 @@ export default function PanoramaApp() {
         </div>
       </div>
       <div className="game-scene photorealistic">
-        <Canvas camera={{ position: [10, 5.5, 10], fov: 60 }} dpr={[1, 1.5]}
+        <Canvas camera={{ position: [12, 6.5, 12], fov: 55 }} dpr={[1, 1.5]}
           gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}>
           {/* Background panorama */}
           <PanoramaBackground key={node.id} files={node.files} />
@@ -89,7 +95,15 @@ export default function PanoramaApp() {
           ))}
 
           {/* Static camera + orbit (no follow) */}
-          <OrbitControls enableDamping dampingFactor={0.08} minDistance={4} maxDistance={20} />
+          <OrbitControls
+            enableDamping
+            dampingFactor={0.1}
+            minDistance={6}
+            maxDistance={28}
+            target={[0, 0.8, -6]}
+            minPolarAngle={0.35}
+            maxPolarAngle={1.2}
+          />
 
           {/* Lighting for the character */}
           <ambientLight intensity={0.6} />

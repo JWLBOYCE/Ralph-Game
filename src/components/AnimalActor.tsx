@@ -97,6 +97,12 @@ export default function AnimalActor({ name, species, position, desired, happy, r
 
   return (
     <group ref={group} position={position}>
+      {/* Soft ground anchor to prevent floating illusion */}
+      <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, 0.01, 0]}
+            renderOrder={-1}>
+        <ringGeometry args={[0.8, 1.2, 32]} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.09} />
+      </mesh>
       {selectedUrl ? (
         <group scale={1.0}><GLTFAnimal url={selectedUrl} species={species} /></group>
       ) : (
