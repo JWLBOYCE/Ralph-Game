@@ -5,7 +5,7 @@ import { OrbitControls, Html } from '@react-three/drei'
 import { DachshundRigged } from './components/DachshundRigged'
 import AnimalActor from './components/AnimalActor'
 import ConfettiBurst from './components/ConfettiBurst'
-import { playAnimalApproval, startAmbient, setSfxVolume } from './utils/audio'
+import { playAnimalApproval, setSfxVolume } from './utils/audio'
 import PanoramaBackground from './components/PanoramaBackground'
 // Single location (Street) only
 import { getNode, PANORAMA_NODES } from './panorama/nodes'
@@ -22,7 +22,7 @@ export default function PanoramaApp() {
   const [calledId, setCalledId] = useState<string | null>(null)
   const controlsRef = useRef<any>(null)
   const [cam, setCam] = useState<THREE.PerspectiveCamera | null>(null)
-  const moveTargetRef = useRef<[number,number,number] | null>(null)
+  // Click-to-move disabled; keyboard only
   const [sfxVol, setSfxVol] = useState(1.0)
   const [reducedMotion, setReducedMotion] = useState(false)
   const [showCameraMenu, setShowCameraMenu] = useState(false)
@@ -248,7 +248,7 @@ export default function PanoramaApp() {
             <h3 style={{ marginTop: 0 }}>How to Play</h3>
             <ul style={{ lineHeight: 1.6 }}>
               <li>Drag to look around</li>
-              <li>Click/tap the ground to move Ralph</li>
+              <li>Use Arrow Keys to move Ralph</li>
               <li>Press S / L / R to Sit / Lie / Roll</li>
               <li>Get close to animals for name bubbles</li>
               <li>Hold C to call the nearest animal</li>
@@ -279,12 +279,12 @@ export default function PanoramaApp() {
             </div>
           </div>
         )}
-        {/* Challenge pill bottom center */}
+        {/* Challenge pill bottom center (higher contrast) */}
         {challenge && (
-          <div className="controls-info" style={{ position: 'absolute', zIndex: 5, left: '50%', transform: 'translateX(-50%)', bottom: 16, background: 'rgba(0,0,0,0.45)', padding: '6px 12px', borderRadius: 999 }}>
+          <div className="controls-info" style={{ position: 'absolute', zIndex: 5, left: '50%', transform: 'translateX(-50%)', bottom: 16, background: 'rgba(0,0,0,0.7)', padding: '8px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.25)', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)', color: '#fff', fontWeight: 600, textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
             <span>Do {challenge.trick.toUpperCase()} near {(() => { const t = people.find(p => p.id === challenge.id); return t ? t.name : challenge.id.toUpperCase() })()}</span>
-            <span style={{ marginLeft: 8 }}>⏳ {Math.max(0, Math.ceil((challenge.expiresAt - performance.now())/1000))}s</span>
-            {streak > 1 && <span style={{ marginLeft: 8 }}>🔥 {streak}</span>}
+            <span style={{ marginLeft: 10 }}>⏳ {Math.max(0, Math.ceil((challenge.expiresAt - performance.now())/1000))}s</span>
+            {streak > 1 && <span style={{ marginLeft: 10 }}>🔥 {streak}</span>}
           </div>
         )}
         <Canvas camera={{ position: [12, 6.5, 12], fov: 55 }} dpr={[1, 1.5]}
@@ -306,13 +306,6 @@ export default function PanoramaApp() {
             maxPolarAngle={1.2}
           />
 
-          {/* Invisible floor to support click-to-move */}
-          <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, 0, 0]}
-                onPointerDown={(e) => { startAmbient(); const p = e.point; moveTargetRef.current = [p.x, 0.5, p.z] }}>
-            <planeGeometry args={[200, 200]} />
-            <meshBasicMaterial transparent opacity={0} />
-          </mesh>
-
           {/* Lighting for the character */}
           <ambientLight intensity={0.6} />
           <directionalLight position={[10, 10, 5]} intensity={1} />
@@ -323,7 +316,6 @@ export default function PanoramaApp() {
             onPosition={setRalphPos}
             showInteractionButtons={false}
             onTrick={handleTrick}
-            moveTarget={moveTargetRef.current || undefined}
           />
 
           {bursts.map((b) => (
@@ -332,7 +324,7 @@ export default function PanoramaApp() {
           {/* Success toasts near Ralph */}
           {toasts.map((t) => (
             <Html key={t.id} position={t.pos} center>
-              <div style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px', borderRadius: 8, fontWeight: 600 }}>{t.text}</div>
+              <div style={{ background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '6px 10px', borderRadius: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.25)', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>{t.text}</div>
             </Html>
           ))}
 

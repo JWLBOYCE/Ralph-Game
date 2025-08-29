@@ -1,7 +1,7 @@
 import { Html, useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useMemo } from 'react'
 
 export type Species = 'cow' | 'pig' | 'manatee' | 'platypus' | 'unicorn' | 'zebra' | 'donkey'
 
@@ -27,13 +27,13 @@ function GLTFAnimal({ url, species }: { url: string; species: Species }) {
     box.getSize(size)
     const height = Math.max(0.001, size.y)
     const target: Record<Species, number> = {
-      cow: 3.2,
-      pig: 2.0,
-      manatee: 2.4,
-      platypus: 1.2,
-      unicorn: 3.2,
-      zebra: 3.2,
-      donkey: 2.8,
+      cow: 4.4,
+      pig: 2.6,
+      manatee: 3.2,
+      platypus: 2.4,
+      unicorn: 3.8,
+      zebra: 3.8,
+      donkey: 3.2,
     }
     const s = target[species] / height
     // place feet on ground
@@ -62,6 +62,34 @@ export default function AnimalActor({ name, species, position, desired, happy, r
       group.current.rotation.y = 0
     }
   }, [])
+
+  const shadowTex = useMemo(() => {
+    const s = 128
+    const canvas = document.createElement('canvas')
+    canvas.width = s; canvas.height = s
+    const ctx = canvas.getContext('2d')!
+    const grd = ctx.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2)
+    grd.addColorStop(0, 'rgba(0,0,0,0.5)')
+    grd.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.fillStyle = grd
+    ctx.fillRect(0,0,s,s)
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.minFilter = THREE.LinearFilter
+    tex.magFilter = THREE.LinearFilter
+    tex.wrapS = THREE.ClampToEdgeWrapping
+    tex.wrapT = THREE.ClampToEdgeWrapping
+    return tex
+  }, [])
+
+  const speciesShadowRadius: Record<Species, number> = {
+    cow: 1.6,
+    pig: 1.0,
+    manatee: 1.2,
+    platypus: 0.8,
+    unicorn: 1.5,
+    zebra: 1.5,
+    donkey: 1.3,
+  }
 
   useEffect(() => {
     let canceled = false
@@ -129,27 +157,27 @@ export default function AnimalActor({ name, species, position, desired, happy, r
   return (
     <group ref={group} position={position}>
       {/* Soft ground anchor to prevent floating illusion */}
-      <mesh ref={ringRef} rotation={[-Math.PI/2, 0, 0]} position={[0, 0.01, 0]}
+      <mesh ref={ringRef} rotation={[-Math.PI/2, 0, 0]} position={[0, 0.001, 0]}
             renderOrder={-1}>
         <ringGeometry args={[0.8, 1.2, 32]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.09} />
-      </mesh>
-      {/* Soft blob shadow */}
-      <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, 0.008, 0]} renderOrder={-2}>
-        <circleGeometry args={[1.1, 32]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.06} />
+      </mesh>
+      {/* Soft radial ground shadow for grounding */}
+      <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, 0.0005, 0]} renderOrder={-2}>
+        <circleGeometry args={[speciesShadowRadius[species], 64]} />
+        <meshBasicMaterial map={shadowTex} transparent opacity={0.9} depthWrite={false} />
       </mesh>
       {selectedUrl ? (
         <group scale={1.0}><GLTFAnimal url={selectedUrl} species={species} /></group>
       ) : (
         <>
-          {species === 'cow' && <group scale={2}><Cow /></group>}
-          {species === 'pig' && <group scale={2}><Pig /></group>}
-          {species === 'manatee' && <group scale={2}><Manatee /></group>}
-          {species === 'platypus' && <group scale={2}><Platypus /></group>}
-          {species === 'unicorn' && <group scale={2}><Unicorn /></group>}
-          {species === 'zebra' && <group scale={2}><Zebra /></group>}
-          {species === 'donkey' && <group scale={2}><Donkey /></group>}
+          {species === 'cow' && <group scale={2.6}><Cow /></group>}
+          {species === 'pig' && <group scale={2.2}><Pig /></group>}
+          {species === 'manatee' && <group scale={2.4}><Manatee /></group>}
+          {species === 'platypus' && <group scale={2.0}><Platypus /></group>}
+          {species === 'unicorn' && <group scale={2.6}><Unicorn /></group>}
+          {species === 'zebra' && <group scale={2.6}><Zebra /></group>}
+          {species === 'donkey' && <group scale={2.3}><Donkey /></group>}
         </>
       )}
       {(() => {
