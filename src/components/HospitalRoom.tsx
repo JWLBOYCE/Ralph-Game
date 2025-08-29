@@ -11,9 +11,15 @@ export default function HospitalRoom() {
         <boxGeometry args={[20, 8, 14]} />
         <meshStandardMaterial side={THREE.BackSide} color="#f3f4f6" roughness={1} metalness={0} />
       </mesh>
+      {/* Window panel */}
       <mesh position={[0, 1.5, -7]}>
         <planeGeometry args={[6, 3]} />
         <meshStandardMaterial color="#d1d5db" roughness={0.7} metalness={0.05} />
+      </mesh>
+      {/* Overhead light strip */}
+      <mesh position={[0, 3.6, 0]}>
+        <boxGeometry args={[5, 0.15, 0.4]} />
+        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={2} />
       </mesh>
       <group position={[-6, -0.2, -3]}>
         <mesh position={[0, 0.4, 0]}>
@@ -29,7 +35,7 @@ export default function HospitalRoom() {
           <meshStandardMaterial color="#9ca3af" />
         </mesh>
       </group>
-      <pointLight position={[0, 3.5, 0]} intensity={0.6} color="#ffffff" />
+      <pointLight position={[0, 3.5, 0]} intensity={0.9} color="#ffffff" />
     </group>
   )
 }

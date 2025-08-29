@@ -5,15 +5,16 @@ import { useMemo, useRef } from "react"
 interface Props {
   position: [number, number, number]
   onDone?: () => void
+  count?: number
 }
 
-export default function ConfettiBurst({ position, onDone }: Props) {
+export default function ConfettiBurst({ position, onDone, count = 32 }: Props) {
   const group = useRef<THREE.Group>(null)
   const start = useMemo(() => performance.now(), [])
   const parts = useMemo(() => {
     const arr: { vel: THREE.Vector3; rot: THREE.Vector3; color: string }[] = []
     const colors = ['#ff6b6b','#ffd93d','#6bcBef','#b28dff','#4dd599']
-    for (let i=0;i<32;i++) {
+    for (let i=0;i<count;i++) {
       arr.push({
         vel: new THREE.Vector3((Math.random()-0.5)*2, Math.random()*2+1, (Math.random()-0.5)*2),
         rot: new THREE.Vector3(Math.random()*2, Math.random()*2, Math.random()*2),
@@ -21,7 +22,7 @@ export default function ConfettiBurst({ position, onDone }: Props) {
       })
     }
     return arr
-  }, [])
+  }, [count])
 
   useFrame(() => {
     const t = (performance.now() - start)/1000

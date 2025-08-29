@@ -17,6 +17,7 @@ interface DachshundRiggedProps {
   action?: InteractionType
   ballPosition?: Vec3
   onTrick?: (t: Trick, p: Vec3) => void
+  moveTarget?: Vec3
 }
 
 // Try to use a local dachshund model if present (served from public/models),
@@ -71,7 +72,7 @@ function FootstepDust({ position }: { position: THREE.Vector3 }) {
   )
 }
 
-export function DachshundRigged({ position, onInteraction, onPosition, showInteractionButtons, mobileDirection = 'stop', onTrick }: DachshundRiggedProps) {
+export function DachshundRigged({ position, onInteraction, onPosition, showInteractionButtons, mobileDirection = 'stop', onTrick, moveTarget }: DachshundRiggedProps) {
   const url = useDogModelUrl()
   const ref = useRef<THREE.Group>(null)
 
@@ -81,6 +82,8 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
   const lastPos = useRef(new THREE.Vector3())
   const trickRef = useRef<Trick | null>(null)
   const trickUntil = useRef<number>(0)
+  const moveTargetRef = useRef<Vec3 | null>(null)
+  useEffect(() => { moveTargetRef.current = moveTarget ?? null }, [moveTarget])
 
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
@@ -160,6 +163,19 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
     if (mobileDirection && mobileDirection !== 'stop') {
       mx += mobileDirection === 'left' ? -1 : mobileDirection === 'right' ? 1 : 0
       mz += mobileDirection === 'up' ? -1 : mobileDirection === 'down' ? 1 : 0
+    }
+    // Click-to-move target overrides when present
+    if (!trickRef.current && moveTargetRef.current) {
+      const tgt = moveTargetRef.current
+      const dx = tgt[0] - body.position.x
+      const dz = tgt[2] - body.position.z
+      const dist = Math.hypot(dx, dz)
+      if (dist > 0.1) {
+        mx += dx / dist
+        mz += dz / dist
+      } else {
+        moveTargetRef.current = null
+      }
     }
     const moving = mx !== 0 || mz !== 0
     setIsMoving(moving)

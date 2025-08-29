@@ -1,6 +1,8 @@
 export type InteractionType = 'pet' | 'treat' | 'play' | 'play_ball' | 'bark' | 'belly_rub' | 'jump';
 
 let audioCtx: (AudioContext | null) = null;
+let sfxMasterGain: GainNode | null = null;
+let sfxVolume = 1.0;
 let barkBuffers: AudioBuffer[] = [];
 let barkPreloadPromise: Promise<void> | null = null;
 
@@ -14,6 +16,23 @@ export function getAudioContext(): AudioContext | null {
   } catch {
     return null;
   }
+}
+
+function getSfxMaster(): GainNode | null {
+  const ctx = getAudioContext();
+  if (!ctx) return null;
+  if (!sfxMasterGain) {
+    sfxMasterGain = ctx.createGain();
+    sfxMasterGain.gain.value = sfxVolume;
+    sfxMasterGain.connect(ctx.destination);
+  }
+  return sfxMasterGain;
+}
+
+export function setSfxVolume(vol: number) {
+  sfxVolume = Math.max(0, Math.min(1, vol));
+  const g = getSfxMaster();
+  if (g) g.gain.value = sfxVolume;
 }
 
 async function loadAudioBuffer(url: string): Promise<AudioBuffer> {
@@ -63,7 +82,8 @@ function playBarkSample() {
         src.playbackRate.value = 0.9 + Math.random() * 0.2;
         const gain = ctx.createGain();
         gain.gain.value = 0.7;
-        src.connect(gain).connect(ctx.destination);
+        const master = getSfxMaster();
+        src.connect(gain).connect(master || ctx.destination);
         src.start();
       } catch { /* ignore */ }
       return;
@@ -71,9 +91,10 @@ function playBarkSample() {
     // Fallback: synthesize a bark-like sound (two short bursts with a pitch drop + noise)
     try {
       if (ctx.state === 'suspended') ctx.resume();
+      const out = getSfxMaster();
       const master = ctx.createGain();
       master.gain.value = 0.5;
-      master.connect(ctx.destination);
+      master.connect(out || ctx.destination);
 
       const burst = (t0: number) => {
         const osc = ctx.createOscillator();
@@ -125,7 +146,8 @@ export function playInteractionTone(type: InteractionType) {
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
     oscillator.connect(gain);
-    gain.connect(ctx.destination);
+    const out = getSfxMaster();
+    gain.connect(out || ctx.destination);
 
     let frequency = 400;
     switch (type) {
@@ -168,7 +190,8 @@ export async function playSuccessChime() {
       const src = ctx.createBufferSource();
       src.buffer = ok[(Math.random()*ok.length)|0];
       const g = ctx.createGain(); g.gain.value = 0.6;
-      src.connect(g).connect(ctx.destination);
+      const out = getSfxMaster();
+      src.connect(g).connect(out || ctx.destination);
       src.start();
       return;
     }
@@ -177,7 +200,8 @@ export async function playSuccessChime() {
   // Fallback: synth chime (two quick notes)
   try {
     if (ctx.state === 'suspended') ctx.resume();
-    const g = ctx.createGain(); g.gain.value = 0.15; g.connect(ctx.destination);
+    const out = getSfxMaster();
+    const g = ctx.createGain(); g.gain.value = 0.15; g.connect(out || ctx.destination);
     const o1 = ctx.createOscillator(); o1.type = 'sine';
     const o2 = ctx.createOscillator(); o2.type = 'sine';
     o1.connect(g); o2.connect(g);
@@ -189,7 +213,7 @@ export async function playSuccessChime() {
   } catch {}
 }
 
-export async function playAnimalApproval(species: string) {
+export async function playAnimalApproval(species: string, position?: [number, number, number]) {
   const ctx = getAudioContext();
   if (!ctx) return playSuccessChime();
   const candidates = [
@@ -203,7 +227,21 @@ export async function playAnimalApproval(species: string) {
       src.buffer = buf;
       const g = ctx.createGain();
       g.gain.value = 0.6;
-      src.connect(g).connect(ctx.destination);
+      if (position) {
+        const p = ctx.createPanner();
+        p.panningModel = 'HRTF';
+        p.distanceModel = 'inverse';
+        p.refDistance = 2.0;
+        p.maxDistance = 50;
+        p.rolloffFactor = 1.0;
+        // @ts-ignore legacy API setPosition exists across browsers
+        p.setPosition(position[0], position[1], position[2]);
+        const out = getSfxMaster();
+        src.connect(g).connect(p).connect(out || ctx.destination);
+      } else {
+        const out = getSfxMaster();
+        src.connect(g).connect(out || ctx.destination);
+      }
       src.start();
       return;
     } catch {}
@@ -212,19 +250,37 @@ export async function playAnimalApproval(species: string) {
 }
 
 let ambientStarted = false
+let ambientStreetGain: GainNode | null = null;
+let ambientHospitalGain: GainNode | null = null;
 export async function startAmbient() {
   if (ambientStarted) return
   ambientStarted = true
   const ctx = getAudioContext();
   if (!ctx) return
   try {
-    const urls = ['/sounds/ambient-wind.mp3','/sounds/ambient-birds.mp3']
-    const bufs: AudioBuffer[] = []
-    for (const u of urls) { try { bufs.push(await loadAudioBuffer(u)) } catch {} }
-    if (!bufs.length) return
-    const g = ctx.createGain(); g.gain.value = 0.08; g.connect(ctx.destination)
-    for (const b of bufs) {
-      const s = ctx.createBufferSource(); s.buffer = b; s.loop = true; s.connect(g); s.start()
-    }
+    const streetUrls = ['/sounds/ambient-wind.mp3','/sounds/ambient-birds.mp3']
+    const hospitalUrls = ['/sounds/ambient-hvac.mp3','/sounds/ambient-roomtone.mp3']
+    const streetBufs: AudioBuffer[] = []
+    const hospitalBufs: AudioBuffer[] = []
+    for (const u of streetUrls) { try { streetBufs.push(await loadAudioBuffer(u)) } catch {} }
+    for (const u of hospitalUrls) { try { hospitalBufs.push(await loadAudioBuffer(u)) } catch {} }
+    if (!streetBufs.length && !hospitalBufs.length) return
+    const master = ctx.createGain(); master.gain.value = 0.08; master.connect(ctx.destination)
+    ambientStreetGain = ctx.createGain(); ambientStreetGain.gain.value = 0.8; ambientStreetGain.connect(master)
+    ambientHospitalGain = ctx.createGain(); ambientHospitalGain.gain.value = 0.0; ambientHospitalGain.connect(master)
+    for (const b of streetBufs) { const s = ctx.createBufferSource(); s.buffer = b; s.loop = true; s.connect(ambientStreetGain); s.start() }
+    for (const b of hospitalBufs) { const s = ctx.createBufferSource(); s.buffer = b; s.loop = true; s.connect(ambientHospitalGain); s.start() }
   } catch {}
+}
+
+export function setAmbientLocation(loc: 'street'|'hospital', ms = 600) {
+  const ctx = getAudioContext();
+  if (!ctx || !ambientStarted || !ambientStreetGain || !ambientHospitalGain) return;
+  const t = ctx.currentTime;
+  const targetStreet = loc === 'street' ? 0.8 : 0.0;
+  const targetHospital = loc === 'hospital' ? 0.8 : 0.0;
+  ambientStreetGain.gain.cancelScheduledValues(t);
+  ambientHospitalGain.gain.cancelScheduledValues(t);
+  ambientStreetGain.gain.setTargetAtTime(targetStreet, t, ms / 1000 / 4);
+  ambientHospitalGain.gain.setTargetAtTime(targetHospital, t, ms / 1000 / 4);
 }

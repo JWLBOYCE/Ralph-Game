@@ -12,6 +12,8 @@ interface Props {
   desired: 'sit' | 'lie' | 'roll'
   happy?: boolean
   ralphPos?: [number, number, number]
+  mood?: number
+  targetPos?: [number, number, number]
 }
 
 function GLTFAnimal({ url, species }: { url: string; species: Species }) {
@@ -47,10 +49,13 @@ function GLTFAnimal({ url, species }: { url: string; species: Species }) {
   )
 }
 
-export default function AnimalActor({ name, species, position, desired, happy, ralphPos }: Props) {
+export default function AnimalActor({ name, species, position, desired, happy, ralphPos, mood = 0, targetPos }: Props) {
   const group = useRef<THREE.Group>(null)
   const { camera } = useThree()
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null)
+  const ringRef = useRef<THREE.Mesh>(null)
+  const targetRef = useRef<[number, number, number] | undefined>(undefined)
+  useEffect(() => { targetRef.current = targetPos }, [targetPos])
 
   useEffect(() => {
     let canceled = false
@@ -91,17 +96,42 @@ export default function AnimalActor({ name, species, position, desired, happy, r
     return () => { canceled = true }
   }, [species, name])
 
-  useFrame(() => {
-    if (group.current) group.current.lookAt(camera.position.x, camera.position.y, camera.position.z)
+  useFrame((_, delta) => {
+    if (group.current) {
+      group.current.lookAt(camera.position.x, camera.position.y, camera.position.z)
+      // move toward target if any
+      if (targetRef.current) {
+        const g = group.current
+        const tx = targetRef.current[0], tz = targetRef.current[2]
+        const dx = tx - g.position.x, dz = tz - g.position.z
+        const dist = Math.hypot(dx, dz)
+        if (dist > 0.2) {
+          const speed = 1.6
+          g.position.x += (dx / dist) * speed * delta
+          g.position.z += (dz / dist) * speed * delta
+        }
+      }
+      // ring opacity by proximity
+      if (ralphPos && ringRef.current) {
+        const d = Math.hypot(group.current.position.x - ralphPos[0], group.current.position.z - ralphPos[2])
+        const mat = ringRef.current.material as THREE.MeshBasicMaterial
+        mat.opacity = d < 3 ? 0.16 : d < 6 ? 0.08 : 0.04
+      }
+    }
   })
 
   return (
     <group ref={group} position={position}>
       {/* Soft ground anchor to prevent floating illusion */}
-      <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, 0.01, 0]}
+      <mesh ref={ringRef} rotation={[-Math.PI/2, 0, 0]} position={[0, 0.01, 0]}
             renderOrder={-1}>
         <ringGeometry args={[0.8, 1.2, 32]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.09} />
+      </mesh>
+      {/* Soft blob shadow */}
+      <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, 0.008, 0]} renderOrder={-2}>
+        <circleGeometry args={[1.1, 32]} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.06} />
       </mesh>
       {selectedUrl ? (
         <group scale={1.0}><GLTFAnimal url={selectedUrl} species={species} /></group>
@@ -129,6 +159,9 @@ export default function AnimalActor({ name, species, position, desired, happy, r
                 return species === 'donkey' ? 'Eeyore' : `${name} the ${title(species)}`
               })()}</div>
               <div className="sky-label-command">{happy ? '😊 Happy!' : (desired === 'sit' ? 'Press S to Sit' : desired === 'lie' ? 'Press L to Lie' : 'Press R to Roll')}</div>
+              <div className="sky-label-mood" style={{ marginTop: 4, background: 'rgba(0,0,0,0.25)', width: 120, height: 8, borderRadius: 4 }}>
+                <div style={{ width: `${mood}%`, height: '100%', background: mood > 66 ? '#4dd599' : mood > 33 ? '#ffd93d' : '#ff6b6b', borderRadius: 4 }} />
+              </div>
             </div>
           </Html>
         )
