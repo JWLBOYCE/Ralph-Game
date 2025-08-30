@@ -22,6 +22,7 @@ export default function PanoramaApp() {
   const [calledId, setCalledId] = useState<string | null>(null)
   const controlsRef = useRef<any>(null)
   const [cam, setCam] = useState<THREE.PerspectiveCamera | null>(null)
+  const [camFov, setCamFov] = useState(55)
   // Click-to-move disabled; keyboard only
   const [sfxVol, setSfxVol] = useState(1.0)
   const [reducedMotion, setReducedMotion] = useState(false)
@@ -117,6 +118,13 @@ export default function PanoramaApp() {
       tweenCamera(new THREE.Vector3(0, 0.8, -6), 14, 320)
     }, 900)
   }
+
+  // Keep camera fov in sync so background appears to zoom as well
+  useEffect(() => {
+    if (!cam) return
+    cam.fov = camFov
+    cam.updateProjectionMatrix()
+  }, [camFov, cam])
 
   function handleTrick(trick: 'sit'|'lie'|'roll', p: [number,number,number]) {
     // Check nearest person in radius
@@ -303,9 +311,15 @@ export default function PanoramaApp() {
             {streak > 1 && <span style={{ marginLeft: 10 }}>🔥 {streak}</span>}
           </div>
         )}
-        <Canvas camera={{ position: [12, 6.5, 12], fov: 55 }} dpr={[1, 1.5]}
+        <Canvas camera={{ position: [12, 6.5, 12], fov: camFov }} dpr={[1, 1.5]}
           gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
           onCreated={({ camera }) => { setCam(camera as THREE.PerspectiveCamera) }}
+          onWheel={(e) => {
+            e.preventDefault()
+            const delta = Math.sign(e.deltaY)
+            const next = Math.max(35, Math.min(85, camFov + delta * 3))
+            setCamFov(next)
+          }}
         >
           {/* Background/environment per location */}
           <PanoramaBackground key={node.id} files={node.files} />
@@ -315,6 +329,7 @@ export default function PanoramaApp() {
             ref={controlsRef}
             enableDamping
             dampingFactor={0.1}
+            enableZoom={false}
             minDistance={6}
             maxDistance={28}
             target={[0, 0.8, -6]}

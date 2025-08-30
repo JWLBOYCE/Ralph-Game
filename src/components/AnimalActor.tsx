@@ -72,6 +72,14 @@ export default function AnimalActor({ name, species, position, desired, happy, r
       group.current.rotation.y = 0
     }
   }, [])
+  const celebrateUntil = useRef<number>(0)
+  const prevHappy = useRef<boolean>(!!happy)
+  useEffect(() => {
+    if (!prevHappy.current && happy) {
+      celebrateUntil.current = performance.now() + 900
+    }
+    prevHappy.current = !!happy
+  }, [happy])
 
   const shadowTex = useMemo(() => {
     const s = 128
@@ -160,6 +168,13 @@ export default function AnimalActor({ name, species, position, desired, happy, r
         const d = Math.hypot(group.current.position.x - ralphPos[0], group.current.position.z - ralphPos[2])
         const mat = ringRef.current.material as THREE.MeshBasicMaterial
         mat.opacity = d < 3 ? 0.16 : d < 6 ? 0.08 : 0.04
+      }
+      // quick celebrate bounce
+      if (performance.now() < celebrateUntil.current) {
+        const t = (celebrateUntil.current - performance.now()) / 900
+        const k = 1 - t
+        group.current.position.y = 0.08 * Math.sin(k * Math.PI * 4)
+        group.current.rotation.z = 0.08 * Math.sin(k * Math.PI * 4)
       }
     }
   })
