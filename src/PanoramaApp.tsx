@@ -108,6 +108,16 @@ export default function PanoramaApp() {
     setTimeout(() => tweenCamera(target, 14, 260), 220)
   }
 
+  function eyeRollZoom() {
+    if (!controlsRef.current || !cam) return
+    const faceTarget = new THREE.Vector3(ralphPos[0], ralphPos[1] + 0.7, ralphPos[2])
+    tweenCamera(faceTarget, 8, 260)
+    // zoom back out after the eye roll
+    setTimeout(() => {
+      tweenCamera(new THREE.Vector3(0, 0.8, -6), 14, 320)
+    }, 900)
+  }
+
   function handleTrick(trick: 'sit'|'lie'|'roll', p: [number,number,number]) {
     // Check nearest person in radius
     let nearest: { id: string; desired: 'sit'|'lie'|'roll'; species: string; pos: [number,number,number] } | null = null
@@ -282,7 +292,13 @@ export default function PanoramaApp() {
         {/* Challenge pill bottom center (higher contrast) */}
         {challenge && (
           <div className="controls-info" style={{ position: 'absolute', zIndex: 5, left: '50%', transform: 'translateX(-50%)', bottom: 16, background: 'rgba(0,0,0,0.7)', padding: '8px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.25)', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)', color: '#fff', fontWeight: 600, textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
-            <span>Do {challenge.trick.toUpperCase()} near {(() => { const t = people.find(p => p.id === challenge.id); return t ? t.name : challenge.id.toUpperCase() })()}</span>
+            {(() => {
+              const t = challenge.trick
+              const key = t === 'sit' ? 'S' : t === 'lie' ? 'L' : 'R'
+              const word = t === 'sit' ? 'Sit' : t === 'lie' ? 'Lie' : 'Roll'
+              const name = (() => { const p = people.find(p => p.id === challenge.id); return p ? p.name : challenge.id.toUpperCase() })()
+              return <span>Press {key} to {word} near {name}</span>
+            })()}
             <span style={{ marginLeft: 10 }}>⏳ {Math.max(0, Math.ceil((challenge.expiresAt - performance.now())/1000))}s</span>
             {streak > 1 && <span style={{ marginLeft: 10 }}>🔥 {streak}</span>}
           </div>
@@ -316,6 +332,7 @@ export default function PanoramaApp() {
             onPosition={setRalphPos}
             showInteractionButtons={false}
             onTrick={handleTrick}
+            onEyeRoll={() => eyeRollZoom()}
           />
 
           {bursts.map((b) => (

@@ -18,6 +18,7 @@ interface DachshundRiggedProps {
   ballPosition?: Vec3
   onTrick?: (t: Trick, p: Vec3) => void
   moveTarget?: Vec3
+  onEyeRoll?: (p: Vec3) => void
 }
 
 // Try to use a local dachshund model if present (served from public/models),
@@ -72,7 +73,7 @@ function FootstepDust({ position }: { position: THREE.Vector3 }) {
   )
 }
 
-export function DachshundRigged({ position, onInteraction, onPosition, showInteractionButtons, mobileDirection = 'stop', onTrick, moveTarget }: DachshundRiggedProps) {
+export function DachshundRigged({ position, onInteraction, onPosition, showInteractionButtons, mobileDirection = 'stop', onTrick, moveTarget, onEyeRoll }: DachshundRiggedProps) {
   const url = useDogModelUrl()
   const ref = useRef<THREE.Group>(null)
 
@@ -84,6 +85,11 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
   const trickUntil = useRef<number>(0)
   const moveTargetRef = useRef<Vec3 | null>(null)
   useEffect(() => { moveTargetRef.current = moveTarget ?? null }, [moveTarget])
+  // Eye roll timing
+  const eyeRollUntil = useRef<number>(0)
+  const leftPupil = useRef<THREE.Mesh>(null)
+  const rightPupil = useRef<THREE.Mesh>(null)
+  const eyesGroup = useRef<THREE.Group>(null)
 
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
@@ -101,6 +107,10 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
       if (k === 's') { trickRef.current = 'sit'; trickUntil.current = performance.now() + 1200; onTrick?.('sit', [ref.current?.position.x||0, ref.current?.position.y||0, ref.current?.position.z||0]) }
       if (k === 'l') { trickRef.current = 'lie'; trickUntil.current = performance.now() + 1500; onTrick?.('lie', [ref.current?.position.x||0, ref.current?.position.y||0, ref.current?.position.z||0]) }
       if (k === 'r') { trickRef.current = 'roll'; trickUntil.current = performance.now() + 1600; onTrick?.('roll', [ref.current?.position.x||0, ref.current?.position.y||0, ref.current?.position.z||0]) }
+      if (k === 'e') {
+        eyeRollUntil.current = performance.now() + 1200
+        onEyeRoll?.([ref.current?.position.x||0, ref.current?.position.y||0, ref.current?.position.z||0])
+      }
     }
     const onUp = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase()
@@ -208,9 +218,25 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
     }
     const rp = body.position
     onPosition?.([rp.x, rp.y, rp.z])
+
+    // Eye roll animation: rotate pupils around small circles while active
+    const active = performance.now() < eyeRollUntil.current
+    if (eyesGroup.current) eyesGroup.current.visible = active
+    if (active) {
+      const t = 1 - Math.max(0, (eyeRollUntil.current - performance.now()) / 1200)
+      const angle = t * Math.PI * 4 // two full circles
+      const r = 0.06
+      const ly = leftPupil.current as THREE.Mesh | null
+      const ry = rightPupil.current as THREE.Mesh | null
+      if (ly) { ly.position.x = -0.12 + Math.cos(angle) * r; ly.position.y = 0.55 + Math.sin(angle) * r }
+      if (ry) { ry.position.x = +0.12 + Math.cos(angle) * r; ry.position.y = 0.55 + Math.sin(angle) * r }
+    }
   })
 
   if (!url) return null
+  const isFox = (url || '').includes('Fox.glb')
+  const modelScale = isFox ? 0.03 : 1
+  const modelYOffset = isFox ? -0.3 : 0
   return (
     <group ref={ref} position={new THREE.Vector3(...position)}>
       <Suspense fallback={<Html center className="loading">Loading Ralph…</Html>}>
@@ -219,6 +245,28 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
       {/* group above is the physics body anchor */}
       {/* Dust puff spawner (renders when tick changes) */}
       {dustTick >= 0 && <FootstepDust position={dustPos} />}
+
+      {/* Simple eyes overlay used only during eye-roll */}
+      <group ref={eyesGroup} visible={false} position={[0, modelYOffset, 0]} scale={modelScale}>
+        {/* Whites */}
+        <mesh position={[-0.12, 0.55, 0.32]}>
+          <circleGeometry args={[0.12, 32]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+        <mesh position={[0.12, 0.55, 0.32]}>
+          <circleGeometry args={[0.12, 32]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+        {/* Pupils (animated) */}
+        <mesh ref={leftPupil} position={[-0.12, 0.55, 0.321]}>
+          <circleGeometry args={[0.06, 16]} />
+          <meshBasicMaterial color="#111111" />
+        </mesh>
+        <mesh ref={rightPupil} position={[0.12, 0.55, 0.321]}>
+          <circleGeometry args={[0.06, 16]} />
+          <meshBasicMaterial color="#111111" />
+        </mesh>
+      </group>
 
       {/* In-world interaction buttons */}
       {showInteractionButtons && (
