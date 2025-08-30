@@ -12,13 +12,14 @@ export default function ConfettiBurst({ position, onDone, count = 32 }: Props) {
   const group = useRef<THREE.Group>(null)
   const start = useMemo(() => performance.now(), [])
   const parts = useMemo(() => {
-    const arr: { vel: THREE.Vector3; rot: THREE.Vector3; color: string }[] = []
-    const colors = ['#ff6b6b','#ffd93d','#6bcBef','#b28dff','#4dd599']
+    const arr: { vel: THREE.Vector3; rot: THREE.Vector3; color: string; shape: 'rect'|'tri'|'round' }[] = []
+    const colors = ['#ff6b6b','#ffd93d','#6bcbef','#b28dff','#4dd599','#ffa1ff','#ffd6a5']
     for (let i=0;i<count;i++) {
       arr.push({
-        vel: new THREE.Vector3((Math.random()-0.5)*2, Math.random()*2+1, (Math.random()-0.5)*2),
+        vel: new THREE.Vector3((Math.random()-0.5)*2.2, Math.random()*2+1.2, (Math.random()-0.5)*2.2),
         rot: new THREE.Vector3(Math.random()*2, Math.random()*2, Math.random()*2),
-        color: colors[i%colors.length],
+        color: colors[(Math.random()*colors.length)|0],
+        shape: (Math.random()<0.2?'tri':(Math.random()<0.5?'round':'rect')),
       })
     }
     return arr
@@ -48,7 +49,9 @@ export default function ConfettiBurst({ position, onDone, count = 32 }: Props) {
     <group ref={group} position={position}>
       {parts.map((p, i) => (
         <mesh key={i} position={[0,0,0]}>
-          <planeGeometry args={[0.15, 0.08]} />
+          {p.shape === 'rect' && <planeGeometry args={[0.15, 0.08]} />}
+          {p.shape === 'tri' && <coneGeometry args={[0.09, 0.12, 3]} />}
+          {p.shape === 'round' && <circleGeometry args={[0.06, 12]} />}
           <meshBasicMaterial color={p.color} side={THREE.DoubleSide} />
         </mesh>
       ))}

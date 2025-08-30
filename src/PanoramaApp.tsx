@@ -31,6 +31,9 @@ export default function PanoramaApp() {
   const [showHelp, setShowHelp] = useState(false)
   const [showMinimap, setShowMinimap] = useState(false)
   const [toasts, setToasts] = useState<Array<{ id: string; pos: [number,number,number]; text: string }>>([])
+  const [highContrast, setHighContrast] = useState(false)
+  const [badges, setBadges] = useState<Array<{ id: string; text: string }>>([])
+  const [idleHint, setIdleHint] = useState<{ id: string; trick: Trick } | null>(null)
 
   // Camera tween helper
   function tweenCamera(toTarget: THREE.Vector3, toDistance?: number, ms = 500) {
@@ -99,24 +102,10 @@ export default function PanoramaApp() {
     }, 500)
     return () => clearInterval(i)
   }, [challenge])
-  function dollyCinematic() {
-    if (reducedMotion) return
-    if (!controlsRef.current) return
-    const controls = controlsRef.current as any
-    const target = controls.target.clone()
-    // quick in then out
-    tweenCamera(target, 9, 220)
-    setTimeout(() => tweenCamera(target, 14, 260), 220)
-  }
+  // Cinematic zoom disabled; former logic removed
 
   function eyeRollZoom() {
-    if (!controlsRef.current || !cam) return
-    const faceTarget = new THREE.Vector3(ralphPos[0], ralphPos[1] + 0.7, ralphPos[2])
-    tweenCamera(faceTarget, 8, 260)
-    // zoom back out after the eye roll
-    setTimeout(() => {
-      tweenCamera(new THREE.Vector3(0, 0.8, -6), 14, 320)
-    }, 900)
+    // No camera zoom for eye-roll per updated UX request
   }
 
   // Keep camera fov in sync so background appears to zoom as well
@@ -149,14 +138,21 @@ export default function PanoramaApp() {
       playAnimalApproval(nearest.species, nearest.pos)
       // update streak (reset if > 3s since last success)
       const now = performance.now()
-      setStreak((s) => (now - lastSuccessAt > 3000 ? 1 : s + 1))
+      const nextStreak = (now - lastSuccessAt > 3000 ? 1 : streak + 1)
+      setStreak(nextStreak)
       setLastSuccessAt(now)
-      dollyCinematic()
+      // dollyCinematic() disabled per request: no zoom on success
+      if (nextStreak > 0 && nextStreak % 3 === 0) {
+        const id = `badge-${Date.now()}`
+        setBadges((b) => [...b, { id, text: `${nextStreak} combo! ⭐` }])
+        setTimeout(() => setBadges((arr) => arr.filter(x => x.id !== id)), 1400)
+      }
       // Challenge check
       if (challenge && challenge.id === nearest.id && challenge.trick === trick) {
         setBursts((b) => [...b, { id: `${nearest!.id}-bonus-${Date.now()}`, pos: [p[0], p[1]+0.5, p[2]], count: 96 }])
         newChallenge()
       }
+      // track of specific trick counts removed in this pass
       // Advance that animal's desired trick in a simple cycle
       const next = trick === 'sit' ? 'lie' : trick === 'lie' ? 'roll' : 'sit'
       const idx = people.findIndex(pr => pr.id === nearest!.id)
@@ -165,6 +161,23 @@ export default function PanoramaApp() {
       }
     }
   }
+
+  // Idle hint after inactivity
+  useEffect(() => {
+    let lastInput = performance.now()
+    const onAny = () => { lastInput = performance.now(); setIdleHint(null) }
+    window.addEventListener('keydown', onAny)
+    window.addEventListener('pointerdown', onAny)
+    const iv = setInterval(() => {
+      if (performance.now() - lastInput > 20000) {
+        let nearest = people[0]
+        let best = Infinity
+        for (const p of people) { const d = Math.hypot(p.pos[0]-ralphPos[0], p.pos[2]-ralphPos[2]); if (d < best) { best = d; nearest = p } }
+        setIdleHint({ id: nearest.id, trick: nearest.desired })
+      }
+    }, 2000)
+    return () => { window.removeEventListener('keydown', onAny); window.removeEventListener('pointerdown', onAny); clearInterval(iv) }
+  }, [people, ralphPos])
 
   // Single location (street); no ambient crossfade needed
 
@@ -179,9 +192,12 @@ export default function PanoramaApp() {
       if (mm) setShowMinimap(mm === '1')
       const seen = localStorage.getItem('ralph_help_seen');
       if (!seen) setShowHelp(true)
+      const hc = localStorage.getItem('ralph_high_contrast');
+      if (hc) setHighContrast(hc === '1')
     } catch {}
   }, [])
   useEffect(() => { try { localStorage.setItem('ralph_show_minimap', showMinimap ? '1' : '0') } catch {} }, [showMinimap])
+  useEffect(() => { try { localStorage.setItem('ralph_high_contrast', highContrast ? '1' : '0') } catch {} }, [highContrast])
 
   // Mood decay
   useEffect(() => {
@@ -220,7 +236,7 @@ export default function PanoramaApp() {
   }, [people, ralphPos])
 
   return (
-    <div className="game-container photorealistic">
+    <div className={`game-container photorealistic ${highContrast ? 'hc' : ''}`}>
       <div className="game-header photorealistic" style={{ position: 'relative' }}>
         <h1>Ralph goes to meet his friends</h1>
         <div className="controls-info">
@@ -255,6 +271,9 @@ export default function PanoramaApp() {
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
               <input type="checkbox" checked={showMinimap} onChange={(e) => setShowMinimap(e.target.checked)} /> Show Minimap
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+              <input type="checkbox" checked={highContrast} onChange={(e) => setHighContrast(e.target.checked)} /> High Contrast
             </label>
           </div>
         )}
@@ -311,6 +330,14 @@ export default function PanoramaApp() {
             {streak > 1 && <span style={{ marginLeft: 10 }}>🔥 {streak}</span>}
           </div>
         )}
+        {idleHint && (
+          <div className="controls-info" style={{ position: 'absolute', zIndex: 5, left: '50%', transform: 'translateX(-50%)', bottom: 60, background: 'rgba(0,0,0,0.6)', padding: '6px 12px', borderRadius: 999, color: '#fff', fontWeight: 600 }}>
+            {(() => { const key = idleHint.trick === 'sit' ? 'S' : idleHint.trick === 'lie' ? 'L' : 'R'; const word = idleHint.trick === 'sit' ? 'Sit' : idleHint.trick === 'lie' ? 'Lie' : 'Roll'; const name = (people.find(p => p.id === idleHint.id)?.name || idleHint.id.toUpperCase()); return <span>Try Press {key} to {word} near {name}</span> })()}
+          </div>
+        )}
+        {badges.map((b) => (
+          <div key={b.id} style={{ position: 'absolute', zIndex: 6, left: '50%', transform: 'translateX(-50%)', top: 90, background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', padding: '6px 12px', borderRadius: 999, boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }}>{b.text}</div>
+        ))}
         <Canvas camera={{ position: [12, 6.5, 12], fov: camFov }} dpr={[1, 1.5]}
           gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
           onCreated={({ camera }) => { setCam(camera as THREE.PerspectiveCamera) }}
@@ -337,8 +364,14 @@ export default function PanoramaApp() {
             maxPolarAngle={1.2}
           />
 
-          {/* Lighting for the character */}
-          <ambientLight intensity={0.6} />
+          {/* Lighting */}
+          {(() => {
+            const t = (camFov - 35) / (85 - 35)
+            const inten = 0.75 - t * 0.25
+            const hue = 40 + (1 - t) * 10 // warmer when zoomed in
+            const col = `hsl(${hue}, 35%, 85%)`
+            return <ambientLight intensity={inten} color={col as any} />
+          })()}
           <directionalLight position={[10, 10, 5]} intensity={1} />
 
           {/* Ralph */}
@@ -350,9 +383,9 @@ export default function PanoramaApp() {
             onEyeRoll={() => eyeRollZoom()}
             obstacles={(() => {
               const radiusBy: Record<string, number> = {
-                cow: 1.6, pig: 1.0, manatee: 1.2, platypus: 0.9, unicorn: 1.5, zebra: 1.5, donkey: 1.3,
+                cow: 2.0, pig: 1.3, manatee: 1.7, platypus: 1.2, unicorn: 1.9, zebra: 1.9, donkey: 1.7,
               }
-              return people.map(p => ({ pos: p.pos, r: radiusBy[p.species] || 1.2 }))
+              return people.map(p => ({ pos: p.pos, r: (radiusBy[p.species] || 1.5) + 0.25 }))
             })()}
           />
 

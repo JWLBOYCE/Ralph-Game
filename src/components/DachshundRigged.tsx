@@ -203,7 +203,7 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
       nx = Math.max(-LIMIT, Math.min(LIMIT, nx))
       nz = Math.max(-LIMIT, Math.min(LIMIT, nz))
       // Simple collision resolution with animal obstacles
-      const ralphR = 0.6
+      const ralphR = 0.9
       for (const o of obstacles) {
         const dx = nx - o.pos[0]
         const dz = nz - o.pos[2]
@@ -219,6 +219,12 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
             nx = p.x
             nz = p.z
           }
+          // Tangential slide attempt for smoother wrap-around
+          const tx = - (dz)
+          const tz = (dx)
+          const tlen = Math.hypot(tx, tz) || 1
+          nx += (tx / tlen) * 0.05
+          nz += (tz / tlen) * 0.05
         }
       }
       p.set(nx, p.y, nz)
