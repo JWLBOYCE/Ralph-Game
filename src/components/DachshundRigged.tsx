@@ -19,6 +19,7 @@ interface DachshundRiggedProps {
   onTrick?: (t: Trick, p: Vec3) => void
   moveTarget?: Vec3
   onEyeRoll?: (p: Vec3) => void
+  obstacles?: Array<{ pos: Vec3; r: number }>
 }
 
 // Try to use a local dachshund model if present (served from public/models),
@@ -73,7 +74,7 @@ function FootstepDust({ position }: { position: THREE.Vector3 }) {
   )
 }
 
-export function DachshundRigged({ position, onInteraction, onPosition, showInteractionButtons, mobileDirection = 'stop', onTrick, moveTarget, onEyeRoll }: DachshundRiggedProps) {
+export function DachshundRigged({ position, onInteraction, onPosition, showInteractionButtons, mobileDirection = 'stop', onTrick, moveTarget, onEyeRoll, obstacles = [] }: DachshundRiggedProps) {
   const url = useDogModelUrl()
   const ref = useRef<THREE.Group>(null)
 
@@ -201,6 +202,25 @@ export function DachshundRigged({ position, onInteraction, onPosition, showInter
       const LIMIT = 25
       nx = Math.max(-LIMIT, Math.min(LIMIT, nx))
       nz = Math.max(-LIMIT, Math.min(LIMIT, nz))
+      // Simple collision resolution with animal obstacles
+      const ralphR = 0.6
+      for (const o of obstacles) {
+        const dx = nx - o.pos[0]
+        const dz = nz - o.pos[2]
+        const dist = Math.hypot(dx, dz)
+        const minD = ralphR + o.r
+        if (dist < minD) {
+          if (dist > 1e-3) {
+            const ux = dx / dist, uz = dz / dist
+            nx = o.pos[0] + ux * minD
+            nz = o.pos[2] + uz * minD
+          } else {
+            // Fallback: stay in place if exactly overlapping
+            nx = p.x
+            nz = p.z
+          }
+        }
+      }
       p.set(nx, p.y, nz)
       const desiredYaw = Math.atan2(vx, vz)
       body.rotation.y += (desiredYaw - body.rotation.y) * 0.2

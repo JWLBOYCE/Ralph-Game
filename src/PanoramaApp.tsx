@@ -214,7 +214,7 @@ export default function PanoramaApp() {
   return (
     <div className="game-container photorealistic">
       <div className="game-header photorealistic" style={{ position: 'relative' }}>
-        <h1>Ralph’s Street View</h1>
+        <h1>Ralph goes to meet his friends</h1>
         <div className="controls-info">
           <p>Get close, then press S/L/R to do tricks.</p>
         </div>
@@ -333,6 +333,12 @@ export default function PanoramaApp() {
             showInteractionButtons={false}
             onTrick={handleTrick}
             onEyeRoll={() => eyeRollZoom()}
+            obstacles={(() => {
+              const radiusBy: Record<string, number> = {
+                cow: 1.6, pig: 1.0, manatee: 1.2, platypus: 0.9, unicorn: 1.5, zebra: 1.5, donkey: 1.3,
+              }
+              return people.map(p => ({ pos: p.pos, r: radiusBy[p.species] || 1.2 }))
+            })()}
           />
 
           {bursts.map((b) => (

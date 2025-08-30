@@ -19,6 +19,8 @@ interface Props {
 function GLTFAnimal({ url, species }: { url: string; species: Species }) {
   const { scene } = useGLTF(url)
   const container = useRef<THREE.Group>(null)
+  const baseY = useRef(0)
+  const phase = useRef(Math.random() * Math.PI * 2)
   useEffect(() => {
     if (!scene || !container.current) return
     // Compute bounding box and normalize to a target height per species
@@ -41,7 +43,15 @@ function GLTFAnimal({ url, species }: { url: string; species: Species }) {
     const yOffset = -minY * s
     container.current.scale.setScalar(s)
     container.current.position.y = yOffset
+    baseY.current = yOffset
   }, [scene, species])
+  useFrame(({ clock }) => {
+    if (!container.current) return
+    const t = clock.getElapsedTime()
+    const amp = 0.03
+    container.current.position.y = baseY.current + amp * Math.sin(t * 1.6 + phase.current)
+    container.current.rotation.y = 0.04 * Math.sin(t * 0.8 + phase.current)
+  })
   return (
     <group ref={container}>
       <primitive object={scene} />
@@ -170,15 +180,32 @@ export default function AnimalActor({ name, species, position, desired, happy, r
       {selectedUrl ? (
         <group scale={1.0}><GLTFAnimal url={selectedUrl} species={species} /></group>
       ) : (
-        <>
-          {species === 'cow' && <group scale={2.6}><Cow /></group>}
-          {species === 'pig' && <group scale={2.2}><Pig /></group>}
-          {species === 'manatee' && <group scale={2.4}><Manatee /></group>}
-          {species === 'platypus' && <group scale={2.0}><Platypus /></group>}
-          {species === 'unicorn' && <group scale={2.6}><Unicorn /></group>}
-          {species === 'zebra' && <group scale={2.6}><Zebra /></group>}
-          {species === 'donkey' && <group scale={2.3}><Donkey /></group>}
-        </>
+        (() => {
+          const IdleWrap: React.FC<{children: React.ReactNode}> = ({ children }) => {
+            const idleRef = useRef<THREE.Group>(null)
+            const base = useRef(0)
+            const ph = useRef(Math.random() * Math.PI * 2)
+            useEffect(() => { base.current = idleRef.current?.position.y || 0 }, [])
+            useFrame(({ clock }) => {
+              if (!idleRef.current) return
+              const t = clock.getElapsedTime()
+              idleRef.current.position.y = base.current + 0.03 * Math.sin(t * 1.6 + ph.current)
+              idleRef.current.rotation.y = 0.04 * Math.sin(t * 0.8 + ph.current)
+            })
+            return <group ref={idleRef}>{children}</group>
+          }
+          return (
+            <>
+              {species === 'cow' && <IdleWrap><group scale={2.6}><Cow /></group></IdleWrap>}
+              {species === 'pig' && <IdleWrap><group scale={2.2}><Pig /></group></IdleWrap>}
+              {species === 'manatee' && <IdleWrap><group scale={2.4}><Manatee /></group></IdleWrap>}
+              {species === 'platypus' && <IdleWrap><group scale={2.0}><Platypus /></group></IdleWrap>}
+              {species === 'unicorn' && <IdleWrap><group scale={2.6}><Unicorn /></group></IdleWrap>}
+              {species === 'zebra' && <IdleWrap><group scale={2.6}><Zebra /></group></IdleWrap>}
+              {species === 'donkey' && <IdleWrap><group scale={2.3}><Donkey /></group></IdleWrap>}
+            </>
+          )
+        })()
       )}
       {(() => {
         if (!ralphPos || !group.current) return null
