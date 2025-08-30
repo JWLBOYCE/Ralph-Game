@@ -148,7 +148,7 @@ export default function AnimalActor({ name, species, position, desired, happy, r
     return () => { canceled = true }
   }, [species, name])
 
-  useFrame((_, delta) => {
+  useFrame(({ clock }, delta) => {
     if (group.current) {
       // Keep a fixed facing; do not rotate toward camera
       // move toward target if any
@@ -167,7 +167,11 @@ export default function AnimalActor({ name, species, position, desired, happy, r
       if (ralphPos && ringRef.current) {
         const d = Math.hypot(group.current.position.x - ralphPos[0], group.current.position.z - ralphPos[2])
         const mat = ringRef.current.material as THREE.MeshBasicMaterial
-        mat.opacity = d < 3 ? 0.16 : d < 6 ? 0.08 : 0.04
+        mat.opacity = d < 3 ? 0.18 : d < 6 ? 0.08 : 0.03
+        // subtle pulse when very close
+        const s = d < 3 ? 1.0 + 0.05 * Math.sin(clock.getElapsedTime() * 6) : 1.0
+        const m = ringRef.current
+        if (m) m.scale.setScalar(s)
       }
       // quick celebrate bounce
       if (performance.now() < celebrateUntil.current) {

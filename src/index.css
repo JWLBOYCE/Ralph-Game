@@ -51,6 +51,13 @@
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
 }
+.photorealistic-toggle:hover {
+  transform: translateY(-2px) rotate(-1deg) scale(1.04);
+}
+
+.photorealistic-toggle:active {
+  transform: translateY(0px) scale(0.98);
+}
 
 .photorealistic-toggle:hover {
   background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);

@@ -84,6 +84,11 @@ export default function PanoramaApp() {
 
   const [streak, setStreak] = useState(0)
   const [lastSuccessAt, setLastSuccessAt] = useState<number>(0)
+  const [bestStreak, setBestStreak] = useState(0)
+  const [score, setScore] = useState(() => {
+    try { return parseInt(localStorage.getItem('ralph_score')||'0')||0 } catch { return 0 }
+  })
+  const saveScore = (v: number) => { setScore(v); try { localStorage.setItem('ralph_score', String(v)) } catch {} }
   type Trick = 'sit'|'lie'|'roll'
   const [challenge, setChallenge] = useState<{ id: string; trick: Trick; expiresAt: number } | null>(null)
 
@@ -132,14 +137,19 @@ export default function PanoramaApp() {
       const count = 32 * (1 + intensify)
       setBursts((b) => [...b, { id: `${nearest!.id}-${Date.now()}`, pos: [p[0], p[1]+0.5, p[2]], count }])
       // brief toast near Ralph
+      const base = 100
+      const bonus = intensify * 50
+      const gained = base + bonus
       const tid = `toast-${Date.now()}`
-      setToasts((ts) => [...ts, { id: tid, pos: [p[0], p[1]+1.2, p[2]], text: 'Great!' }])
+      setToasts((ts) => [...ts, { id: tid, pos: [p[0], p[1]+1.2, p[2]], text: `+${gained}` }])
       setTimeout(() => setToasts((arr) => arr.filter(t => t.id !== tid)), 1200)
+      saveScore(score + gained)
       playAnimalApproval(nearest.species, nearest.pos)
       // update streak (reset if > 3s since last success)
       const now = performance.now()
       const nextStreak = (now - lastSuccessAt > 3000 ? 1 : streak + 1)
       setStreak(nextStreak)
+      setBestStreak((b) => Math.max(b, nextStreak))
       setLastSuccessAt(now)
       // dollyCinematic() disabled per request: no zoom on success
       if (nextStreak > 0 && nextStreak % 3 === 0) {
@@ -150,6 +160,7 @@ export default function PanoramaApp() {
       // Challenge check
       if (challenge && challenge.id === nearest.id && challenge.trick === trick) {
         setBursts((b) => [...b, { id: `${nearest!.id}-bonus-${Date.now()}`, pos: [p[0], p[1]+0.5, p[2]], count: 96 }])
+        saveScore(score + gained + 100)
         newChallenge()
       }
       // track of specific trick counts removed in this pass
@@ -237,13 +248,23 @@ export default function PanoramaApp() {
 
   return (
     <div className={`game-container photorealistic ${highContrast ? 'hc' : ''}`}>
-      <div className="game-header photorealistic" style={{ position: 'relative' }}>
-        <h1>Ralph goes to meet his friends</h1>
+      <div className="game-header photorealistic" style={{ position: 'relative' }} onMouseMove={(e) => {
+        const el = document.getElementById('title'); if (!el) return;
+        const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+        const cx = rect.left + rect.width/2; const cy = rect.top + rect.height/2;
+        const dx = (e.clientX - cx) / rect.width; const dy = (e.clientY - cy) / rect.height;
+        el.style.transform = `perspective(600px) rotateX(${(-dy*3).toFixed(2)}deg) rotateY(${(dx*3).toFixed(2)}deg)`;
+      }} onMouseLeave={() => { const el = document.getElementById('title'); if (el) el.style.transform = 'none'; }}>
+        <h1 id="title">Ralph goes to meet his friends</h1>
         <div className="controls-info">
           <p>Get close, then press S/L/R to do tricks.</p>
         </div>
         {/* Single location; tabs removed */}
         <div style={{ position: 'absolute', right: 12, top: 12, display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 8 }}>
+            <span style={{ fontWeight: 700 }}>Score: {score}</span>
+            <span style={{ opacity: 0.8 }}>Best 🔥 {bestStreak}</span>
+          </div>
           <button className="photorealistic-toggle" aria-label="Camera" title="Camera" onClick={() => { setShowCameraMenu((v)=>!v); setShowSettings(false); }}>
             🎥
           </button>
